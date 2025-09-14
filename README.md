@@ -148,13 +148,5 @@ Contributions are welcome! If you'd like to improve Anaconda WEC, please:
 
 ---
 
-<div align="center">
-  <img src="https://via.placeholder.com/800x100/0a1a2a/3498db?text=Anaconda+WEC" alt="Anaconda WEC Footer" width="100%">
-  <p>© 2025 Anaconda WEC. All Rights Reserved.</p>
-  <p>
-    <a href="https://github.com/newman1x1/anaconda-wec">
-    </a>
-  </p>
-</div>
 
 
