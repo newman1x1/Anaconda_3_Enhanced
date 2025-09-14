@@ -7,10 +7,6 @@
 [![Demo](https://img.shields.io/badge/Demo-Live%20Preview-brightgreen)](https://anaconda-wec.example.com)
 [![Last Updated](https://img.shields.io/badge/Last%20Updated-September%202025-lightgrey)](https://github.com/newman1x1/anaconda-wec)
 
-<div align="center">
-  <img src="https://via.placeholder.com/1200x600/0a1a2a/3498db?text=Anaconda+WEC" alt="Anaconda WEC Banner" width="800px">
-</div>
-
 ## 📋 Table of Contents
 - [🌊 Anaconda WEC - Advanced Wave Energy Converter Simulation 🌊](#-anaconda-wec---advanced-wave-energy-converter-simulation-)
   - [📋 Table of Contents](#-table-of-contents)
@@ -161,3 +157,4 @@ Contributions are welcome! If you'd like to improve Anaconda WEC, please:
     </a>
   </p>
 </div>
+
