@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anaconda WEC - Advanced Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #000;
+            color: #fff;
+        }
+        canvas {
+            display: block;
+        }
+
+        /* lil-gui custom styling */
+        .lil-gui.root {
+            position: absolute !important; 
+            top: 80px !important;
+            left: 30px !important;
+            right: auto !important;
+            background: rgba(10, 10, 15, 0.65) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 12px !important;
+            backdrop-filter: blur(14px) !important;
+            -webkit-backdrop-filter: blur(14px) !important;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+        }
+        .lil-gui.root .title {
+            color: #3498db !important;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.2) !important;
+            font-weight: 600 !important;
+        }
+         .lil-gui.root .name { color: #ccc !important; }
+        .lil-gui.root .controller:not(.folder) { border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; }
+        .lil-gui--font-size-2 { --font-size: 14px !important; }
+
+
+        #titleOverlay {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            opacity: 1; /* Changed from 0 to make it visible */
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            z-index: 1000; /* Ensure it's above other elements */
+        }
+        
+        .nav-btn {
+            font-size: 14px;
+            text-transform: none;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background-color: rgba(52, 152, 219, 0.3);
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: white;
+            transition: background-color 0.2s ease;
+        }
+        
+        .nav-btn:hover {
+            background-color: rgba(52, 152, 219, 0.6);
+        }
+
+        @keyframes fadeIn { to { opacity: 0.9; } }
+
+        #statsPanel {
+            position: absolute;
+            bottom: 30px;
+            left: 30px; 
+            display: flex;
+            flex-direction: column; 
+            gap: 15px;
+            padding: 20px 25px;
+            background: rgba(10, 10, 15, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            width: 280px; 
+            opacity: 0;
+            animation: fadeInPanel 1s ease-out forwards;
+            animation-delay: 0.5s;
+        }
+        @keyframes fadeInPanel { to { opacity: 1; } }
+        .stat { display: flex; align-items: center; gap: 15px; }
+        .stat-icon { width: 24px; height: 24px; stroke: #3498db; }
+        .stat-text { display: flex; flex-direction: row; justify-content: space-between; align-items: baseline; width: 100%; }
+        .stat-label { color: #aaa; font-size: 0.9em; }
+        .stat-value { font-weight: 600; color: #fff; font-size: 1.1em; }
+
+        #summaryPanel {
+            position: absolute;
+            top: 50%;
+            right: 30px; 
+            transform: translateY(-50%) translateX(120%);
+            width: 380px;
+            padding: 25px 30px;
+            background: rgba(10, 10, 15, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            color: white;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out, visibility 0.5s;
+            min-width: 350px;
+            max-width: 400px;
+        }
+        #summaryPanel.visible { opacity: 1; visibility: visible; transform: translateY(-50%) translateX(0); }
+        #summaryPanel h2 { text-align: center; margin-top: 0; font-size: 1.8em; color: #3498db; border-bottom: 1px solid rgba(52, 152, 219, 0.2); padding-bottom: 15px; margin-bottom: 25px; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 30px; }
+        .summary-stat { display: flex; flex-direction: column; gap: 5px; }
+        .summary-stat .stat-label { color: #ccc; font-size: 0.9em; }
+        .summary-stat .stat-value { font-size: 1.4em; font-weight: 600; }
+        .summary-stat.full-width { grid-column: 1 / -1; }
+        #summaryCloseBtn { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; }
+        #summaryCloseBtn:hover { opacity: 1; }
+        .summary-buttons { margin-top: 25px; display: flex; justify-content: space-between; gap: 15px; }
+        .btn { 
+            padding: 10px 15px; 
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2); 
+            background-color: rgba(30, 40, 50, 0.7); 
+            color: white; 
+            cursor: pointer; 
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn:hover { background-color: rgba(40, 50, 60, 0.9); border-color: rgba(255, 255, 255, 0.3); }
+        .btn-primary { 
+            background-color: rgba(52, 152, 219, 0.7); 
+            border-color: rgba(52, 152, 219, 0.3);
+        }
+        .btn-primary:hover {
+            background-color: rgba(52, 152, 219, 0.9);
+            border-color: rgba(52, 152, 219, 0.5);
+        }
+
+        /* Responsive adjustments to prevent panel overlap */
+        @media (max-width: 1400px) {
+            #summaryPanel {
+                width: 340px;
+                padding: 20px 25px;
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            #statsPanel {
+                width: 260px;
+            }
+            #summaryPanel {
+                width: 320px;
+                padding: 20px 25px;
+            }
+        }
+        
+        @media (max-width: 1000px) {
+            #statsPanel {
+                width: 240px;
+                left: 20px;
+            }
+            #summaryPanel {
+                width: 300px;
+                right: 20px;
+                padding: 15px 20px;
+            }
+        }
+
+        /* NEW: Modern Component Labels */
+        .component-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            padding: 8px 12px;
+            background: rgba(10, 10, 15, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            font-size: 13px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            white-space: nowrap;
+        }
+        .component-label.visible {
+            opacity: 1;
+        }
+        .component-label::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .component-label::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: calc(100% + 20px);
+            transform: translateX(-50%);
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #3498db;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Analytics Dashboard and Economic Module Styles */
+        .side-panel {
+            position: absolute;
+            top: 80px;
+            right: 30px;
+            width: 360px;
+            background: rgba(10, 10, 15, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            color: white;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            transition: height 0.3s ease-out;
+        }
+        
+        #analyticsPanel {
+            top: 80px;
+        }
+        
+        #economicPanel {
+            top: calc(80px + 420px + 20px); /* Position below analytics panel with spacing */
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.2);
+        }
+        
+        .panel-header h2 {
+            margin: 0;
+            font-size: 1.4em;
+            color: #3498db;
+        }
+        
+        .panel-toggle-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        
+        .panel-toggle-btn:hover {
+            opacity: 1;
+        }
+        
+        .panel-content {
+            padding: 15px 20px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        
+        .panel-collapsed .panel-content {
+            display: none;
+        }
+        
+        /* Chart styles */
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background: rgba(20, 20, 30, 0.5);
+        }
+        
+        .chart-legend, .compare-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        
+        .analytics-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+        }
+        
+        .analytics-stat, .roi-metric {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .action-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #3498db;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            padding: 8px 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+            margin-top: 15px;
+        }
+        
+        .action-button svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .action-button:hover {
+            background: #2980b9;
+        }
+        
+        /* Economic module styles */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 15px;
+        }
+        
+        .tab-btn {
+            background: none;
+            border: none;
+            color: #ccc;
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .tab-btn.active {
+            color: #3498db;
+        }
+        
+        .tab-btn.active:after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #3498db;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .cost-breakdown {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .cost-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .cost-item.total {
+            background: rgba(52, 152, 219, 0.2);
+            font-weight: bold;
+        }
+        
+        .roi-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        /* Responsive adjustments for panels */
+        @media (max-width: 1400px) {
+            .side-panel {
+                width: 330px;
+            }
+            
+            #economicPanel {
+                top: calc(80px + 380px + 20px);
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .side-panel {
+                width: 300px;
+            }
+            
+            #economicPanel {
+                top: calc(80px + 350px + 20px);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .side-panel {
+                width: 280px;
+                right: 20px;
+            }
+            
+            #analyticsPanel {
+                top: 70px;
+            }
+            
+            #economicPanel {
+                top: calc(70px + 330px + 15px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="titleOverlay">
+        <span>ANACONDA WEC</span>
+        <a href="analytics.html" id="analyticsPageBtn" class="nav-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            Analytics
+        </a>
+    </div>
+    <div id="statsPanel">
+        <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12,6 12,12 16,14"/>
+            </svg>
+            <div class="stat-text">
+                <span class="stat-label">Status</span>
+                <span class="stat-value" id="statusValue">Idle</span>
+            </div>
+        </div>
+        <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+            <div class="stat-text">
+                <span class="stat-label">Power Output</span>
+                <span class="stat-value" id="powerValue">0.0 kW</span>
+            </div>
+        </div>
+        <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M3 17l6-6 4 4 8-8"/>
+            </svg>
+            <div class="stat-text">
+                <span class="stat-label">Wave Speed</span>
+                <span class="stat-value" id="speedValue">1.0 m/s</span>
+            </div>
+        </div>
+        <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            <div class="stat-text">
+                <span class="stat-label">Turbine RPM</span>
+                <span class="stat-value" id="rpmValue">0</span>
+            </div>
+        </div>
+        <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="7.5,4.21 12,6.81 16.5,4.21"/>
+                <polyline points="7.5,19.79 7.5,14.6 3,12"/>
+                <polyline points="21,12 16.5,14.6 16.5,19.79"/>
+            </svg>
+            <div class="stat-text">
+                <span class="stat-label">Efficiency</span>
+                <span class="stat-value" id="efficiencyValue">0%</span>
+            </div>
+        </div>
+        <div class="stat">
+            <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 1v6l4-4M8 7l4 4 4-4"/>
+                <path d="M12 23v-6l4 4M8 17l4-4 4 4"/>
+            </svg>
+            <div class="stat-text">
+                <span class="stat-label">Wave Count</span>
+                <span class="stat-value" id="waveCountValue">0</span>
+            </div>
+        </div>
+    </div>
+    <div id="summaryPanel">
+        <button id="summaryCloseBtn">&times;</button>
+        <h2>Session Summary</h2>
+        <div class="summary-grid">
+            <div class="summary-stat">
+                <span class="stat-label">Runtime</span>
+                <span class="stat-value" id="summaryTime">00:00</span>
+            </div>
+            <div class="summary-stat">
+                <span class="stat-label">Total Energy</span>
+                <span class="stat-value" id="summaryEnergy">0.0 kWh</span>
+            </div>
+            <div class="summary-stat">
+                <span class="stat-label">Average Power</span>
+                <span class="stat-value" id="summaryAvgPower">0 kW</span>
+            </div>
+            <div class="summary-stat">
+                <span class="stat-label">Peak Power</span>
+                <span class="stat-value" id="summaryPeakPower">0 kW</span>
+            </div>
+            <div class="summary-stat">
+                <span class="stat-label">Wave Cycles</span>
+                <span class="stat-value" id="summaryWaves">0</span>
+            </div>
+            <div class="summary-stat">
+                <span class="stat-label">Avg Wave Speed</span>
+                <span class="stat-value" id="summaryAvgSpeed">0 m/s</span>
+            </div>
+            <div class="summary-stat">
+                <span class="stat-label">System Efficiency</span>
+                <span class="stat-value" id="summaryEfficiency">0%</span>
+            </div>
+        </div>
+        <div class="summary-buttons">
+            <button id="viewAnalyticsBtn" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="margin-right: 5px;">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+                View Detailed Analytics
+            </button>
+            <button id="downloadReportBtn" class="btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="margin-right: 5px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export Data
+            </button>
+        </div>
+    </div>
+
+    <!-- Component labels -->
+    <div id="label-tube" class="component-label">Flexible Composite Tube</div>
+    <div id="label-turbine" class="component-label">Power Take-Off Unit</div>
+    <div id="label-anchor" class="component-label">Mooring & Anchor</div>
+    
+    <!-- Analytics and Economic Panels moved to analytics.html -->
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19.1/dist/lil-gui.esm.js",
+                "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { Water } from 'three/addons/objects/Water.js';
+        import { Sky } from 'three/addons/objects/Sky.js';
+        import { GUI } from 'lil-gui';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        // === GLOBAL VARIABLES ===
+        let scene, camera, renderer, controls, composer;
+        let water, sky, sun, directionalLight, anacondaTube, tubeGroup, turbine, splashParticles, anchor;
+        let originalTubeVertices = [];
+        const clock = new THREE.Clock();
+        let bulgeProgress = 0;
+        let lastTurbineRotation = 0;
+        const initialFov = 55;
+        const tubeLength = 100; // Define tubeLength globally
+
+        // --- DOM Elements ---
+        let statusValue, powerValue, speedValue, rpmValue, efficiencyValue, waveCountValue;
+        let summaryPanel, summaryTime, summaryEnergy, summaryAvgPower, summaryPeakPower, summaryWaves, summaryAvgSpeed, summaryEfficiency;
+        let labelElements;
+        
+        // --- Analytics Data Structure ---
+        let powerOutputChart; // Simplified structure for data collection only
+
+        // --- Interaction & State ---
+        let cameraShake = { active: false, intensity: 0.05, duration: 0.5, timer: 0 };
+        let particleTimer = 0;
+        let particleCount = 500; // Define particleCount as a global variable
+        let cinematic = { active: false, pathIndex: 0, progress: 0, speed: 0.08 };
+        const cinematicPath = [ /* ... cinematic path points ... */ ];
+        
+        // --- Session Recording ---
+        let isRecording = false;
+        let sessionStats = { 
+            startTime: 0, 
+            runTime: 0, 
+            totalEnergyKWh: 0,
+            peakPower: 0, 
+            waveCount: 0, 
+            totalWaveSpeed: 0, 
+            totalWaveAmplitude: 0,
+            totalEfficiency: 0,
+            powerReadings: [],
+            potentialEnergy: [], // For tracking theoretical maximum energy
+            timePoints: [], // For x-axis on charts (timestamps)
+            captureFactor: [] // Energy capture efficiency percentage
+        };
+
+        // --- Simulation Parameters ---
+        const params = {
+            animationActive: false,
+            waveSpeed: 1.0,
+            waveAmplitude: 2.2,
+            tubeRadius: 1.5, // Added tube radius as a parameter
+            // Sun position values to match screenshot's evening lighting
+            sunElevation: 2, 
+            sunAzimuth: 184.68,
+            enableCinematicView: false,
+            enableShake: true,
+            enableSplash: true,
+            enableDollyZoom: true,
+        };
+
+        // === INITIALIZATION ===
+        function init() {
+            // ... Scene, Renderer, Camera setup ...
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.6; // Increased exposure for evening lighting
+            renderer.shadowMap.enabled = true; // Enable shadows
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(initialFov, window.innerWidth / window.innerHeight, 1, 20000);
+            // Adjusted camera position to match the screenshot view
+            camera.position.set(-60, 20, 75);
+
+            // MODIFIED: More natural sun, sky, and lighting
+            sun = new THREE.Vector3();
+            sky = new Sky();
+            sky.scale.setScalar(10000);
+            scene.add(sky);
+
+            // Adjusted ambient light to match screenshot - evening glow
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.75);
+            scene.add(ambientLight);
+
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased for evening lighting
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -150;
+            directionalLight.shadow.camera.right = 150;
+            directionalLight.shadow.camera.top = 150;
+            directionalLight.shadow.camera.bottom = -150;
+            scene.add(directionalLight);
+
+            // ... Water setup ...
+            const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
+            water = new Water(waterGeometry, {
+                textureWidth: 512,
+                textureHeight: 512,
+                waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function (texture) {
+                    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                }),
+                sunDirection: new THREE.Vector3(),
+                sunColor: 0xffffff,
+                waterColor: 0x001e0f,
+                distortionScale: 3.7,
+                fog: scene.fog !== undefined
+            });
+            water.rotation.x = -Math.PI / 2;
+            // Adjusted water position to match screenshot (tube partially submerged)
+            water.position.y = -1.5;
+            scene.add(water);
+
+            // ... Controls setup ...
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.maxPolarAngle = Math.PI * 0.55;
+            // Adjusted controls target to focus on the middle of the WEC tube
+            controls.target.set(0, 2, 0);
+            controls.minDistance = 20.0;
+            controls.maxDistance = 400.0;
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.update();
+
+            createModels();
+            updateSun(); // Move after createModels so tubeGroup exists
+            setupPostProcessing();
+            setupGUI();
+            setupUI();
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function updateSun() {
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            const phi = THREE.MathUtils.degToRad(90 - params.sunElevation);
+            const theta = THREE.MathUtils.degToRad(params.sunAzimuth);
+
+            sun.setFromSphericalCoords(1, phi, theta);
+
+            sky.material.uniforms['sunPosition'].value.copy(sun);
+            // MODIFIED: Evening atmosphere with warm, balanced lighting
+            sky.material.uniforms['turbidity'].value = 10; // Reduced for clearer evening sky
+            sky.material.uniforms['rayleigh'].value = 1.2; // Balanced scattering
+            sky.material.uniforms['mieCoefficient'].value = 0.006; // Moderate atmospheric effect
+            sky.material.uniforms['mieDirectionalG'].value = 0.8; // Natural directional scattering
+
+            water.material.uniforms['sunDirection'].value.copy(sun).normalize();
+            directionalLight.position.copy(sun).multiplyScalar(100);
+            directionalLight.target = tubeGroup;
+
+            const fogColor = new THREE.Color().lerpColors(new THREE.Color(0x0a1a2a), new THREE.Color(0x876d53), Math.max(0, params.sunElevation / 20));
+            scene.fog = new THREE.FogExp2(fogColor, 0.0015);
+            renderer.setClearColor(scene.fog.color);
+
+            scene.environment = pmremGenerator.fromScene(sky).texture;
+        }
+
+        // === MODEL CREATION ===
+        function createModels() {
+            tubeGroup = new THREE.Group();
+            // Set initial position to match the screenshot
+            tubeGroup.position.set(0, 0, 0);
+            scene.add(tubeGroup);
+
+            // ... Anaconda tube setup ...
+            const tubeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x222222, // Darker rubber
+                metalness: 0.1, 
+                roughness: 0.6, // Less shiny
+                side: THREE.DoubleSide
+            });
+            const tubeGeometry = new THREE.CylinderGeometry(1.5, 1.5, tubeLength, 64, 100, false);
+            anacondaTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+            anacondaTube.rotation.z = Math.PI / 2;
+            anacondaTube.castShadow = true;
+            anacondaTube.receiveShadow = true;
+            tubeGroup.add(anacondaTube);
+            originalTubeVertices = Array.from(anacondaTube.geometry.attributes.position.array);
+
+            // MODIFIED: Redesigned Turbine
+            turbine = new THREE.Group();
+            const turbineBodyMat = new THREE.MeshStandardMaterial({ color: 0x005A9C, metalness: 0.8, roughness: 0.3 });
+            const housingGeo = new THREE.CylinderGeometry(2.5, 2.5, 5, 32);
+            const housing = new THREE.Mesh(housingGeo, turbineBodyMat);
+            housing.rotation.x = Math.PI / 2;
+            turbine.add(housing);
+
+            const bladeShape = new THREE.Shape();
+            bladeShape.moveTo(0, 0);
+            bladeShape.bezierCurveTo(0.5, 0.5, 0.5, 3.5, 0, 4);
+            bladeShape.bezierCurveTo(-0.5, 3.5, -0.5, 0.5, 0, 0);
+            const extrudeSettings = { depth: 0.2, bevelEnabled: true, bevelSegments: 2, steps: 2, bevelSize: 0.1, bevelThickness: 0.1 };
+            const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, extrudeSettings);
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xE8E8E8, metalness: 0.6, roughness: 0.4 });
+
+            for (let i = 0; i < 5; i++) {
+                const blade = new THREE.Mesh(bladeGeo, bladeMat);
+                blade.position.y = 2.5;
+                blade.rotation.y = Math.PI / 6;
+                const bladeContainer = new THREE.Object3D();
+                bladeContainer.add(blade);
+                bladeContainer.rotation.z = (i * Math.PI * 2) / 5;
+                housing.add(bladeContainer);
+            }
+            turbine.position.set(tubeLength / 2 + 2.5, 0, 0);
+            turbine.traverse(child => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            tubeGroup.add(turbine);
+            
+            // ... Anchor and seabed setup ...
+            const anchorGeo = new THREE.IcosahedronGeometry(2, 0);
+            const anchorMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.9, roughness: 0.5 });
+            anchor = new THREE.Mesh(anchorGeo, anchorMat);
+            // Position anchor based on old model coordinates
+            anchor.position.set(-tubeLength / 2 - 5, -20, 0); // (-55, -20, 0)
+            anchor.castShadow = true;
+            anchor.receiveShadow = true;
+            scene.add(anchor);
+            
+            // Mooring cable - create 3-point curve like the old model
+            const cablePoints = [];
+            cablePoints.push(new THREE.Vector3(-tubeLength / 2, 0, 0));        // Start at tube end (-50, 0, 0)
+            cablePoints.push(new THREE.Vector3(-tubeLength / 2 - 2.5, -10, 0)); // Mid point (-52.5, -10, 0)
+            cablePoints.push(new THREE.Vector3(-tubeLength / 2 - 5, -20, 0));   // End at anchor (-55, -20, 0)
+            
+            const cableCurve = new THREE.CatmullRomCurve3(cablePoints);
+            const cableGeometry = new THREE.TubeGeometry(
+                cableCurve,
+                20, // segments
+                0.15, // radius
+                8, // radial segments
+                false
+            );
+            const cableMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x444444, 
+                metalness: 0.7, 
+                roughness: 0.5 
+            });
+            const mooring = new THREE.Mesh(cableGeometry, cableMaterial);
+            mooring.castShadow = true;
+            mooring.receiveShadow = true;
+            tubeGroup.add(mooring); // Add to tubeGroup like the old model
+            
+            // Seabed - textured uneven plane like the old model
+            const seabedGeo = new THREE.PlaneGeometry(1000, 1000, 50, 50);
+            const seabedMat = new THREE.MeshStandardMaterial({ color: 0x3b322c, roughness: 0.9 });
+            const seabed = new THREE.Mesh(seabedGeo, seabedMat);
+            seabed.rotation.x = -Math.PI / 2;
+            seabed.position.y = -30; // Sets the depth of the seabed
+            
+            // Make the flat plane uneven
+            const pos = seabed.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const z = pos.getZ(i);
+                pos.setZ(i, z + (Math.random() - 0.5) * 5);
+            }
+            seabed.geometry.computeVertexNormals();
+            seabed.castShadow = false;
+            seabed.receiveShadow = true;
+            scene.add(seabed);
+            
+            // Splash particles setup
+            // Using the global particleCount variable (500) defined earlier
+            const particleGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const velocities = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = 0;
+                positions[i * 3 + 1] = 0;
+                positions[i * 3 + 2] = 0;
+                velocities[i * 3] = 0;
+                velocities[i * 3 + 1] = 0;
+                velocities[i * 3 + 2] = 0;
+            }
+            
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particleGeometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            splashParticles = new THREE.Points(particleGeometry, particleMaterial);
+            splashParticles.visible = false;
+            scene.add(splashParticles);
+        }
+
+        function setupPostProcessing() {
+            composer = new EffectComposer(renderer);
+            const renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
+
+            const bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.5, // strength
+                0.4, // radius
+                0.85 // threshold
+            );
+            composer.addPass(bloomPass);
+
+            const outputPass = new OutputPass();
+            composer.addPass(outputPass);
+        }
+        
+        // === ANALYTICS DATA STRUCTURE ===
+        function setupAnalytics() {
+            // Create an empty data structure for power output data
+            powerOutputChart = {
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            data: [] // Actual power
+                        },
+                        {
+                            data: [] // Potential energy
+                        }
+                    ]
+                },
+                update: function() {
+                    // This is just a placeholder function so we don't get errors
+                    // The actual chart is now in analytics.html
+                }
+            };
+        }
+        
+        // === ECONOMIC DATA STRUCTURE ===
+        function setupEconomics() {
+            // We don't need to initialize charts here anymore as they've been moved to analytics.html
+        }
+        
+        // Export performance report as CSV
+        function exportPerformanceReport() {
+            if (!isRecording && sessionStats.powerReadings.length === 0) {
+                alert('No data to export. Run a simulation first.');
+                return;
+            }
+            
+            const headers = ['Time (s)', 'Power Output (kW)', 'Potential Energy (kW)', 'Capture Efficiency (%)', 'Wave Speed (m/s)'];
+            
+            // Create CSV content
+            let csvContent = headers.join(',') + '\\n';
+            
+            // Add data rows
+            const dataLength = Math.min(
+                sessionStats.timePoints.length,
+                sessionStats.powerReadings.length,
+                sessionStats.potentialEnergy.length,
+                sessionStats.captureFactor.length
+            );
+            
+            for (let i = 0; i < dataLength; i++) {
+                const row = [
+                    sessionStats.timePoints[i].toFixed(1),
+                    sessionStats.powerReadings[i].toFixed(2),
+                    sessionStats.potentialEnergy[i].toFixed(2),
+                    sessionStats.captureFactor[i].toFixed(1),
+                    params.waveSpeed.toFixed(1)
+                ];
+                csvContent += row.join(',') + '\\n';
+            }
+            
+            // Add summary data
+            csvContent += '\\n\\nSUMMARY STATISTICS\\n';
+            csvContent += `Total Runtime,${(clock.getElapsedTime() - sessionStats.startTime).toFixed(1)} s\\n`;
+            csvContent += `Total Energy Generated,${sessionStats.totalEnergyKWh.toFixed(3)} kWh\\n`;
+            csvContent += `Peak Power,${sessionStats.peakPower.toFixed(2)} kW\\n`;
+            csvContent += `Average Power,${(sessionStats.powerReadings.reduce((a, b) => a + b, 0) / sessionStats.powerReadings.length).toFixed(2)} kW\\n`;
+            csvContent += `Wave Count,${sessionStats.waveCount}\\n`;
+            csvContent += `Average Efficiency,${(sessionStats.captureFactor.reduce((a, b) => a + b, 0) / sessionStats.captureFactor.length).toFixed(1)}%\\n`;
+            
+            downloadCSV(csvContent, 'anaconda_wec_report');
+        }
+        
+        // Helper function to download CSV content
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // General CSV export function (used by the Export Data button in summary panel)
+        function exportCSV() {
+            if (!isRecording && sessionStats.powerReadings.length === 0) {
+                alert('No data to export. Run a simulation first.');
+                return;
+            }
+            
+            // Create comprehensive report including economic data
+            const runtime = clock.getElapsedTime() - sessionStats.startTime;
+            const avgPower = sessionStats.powerReadings.length > 0 ? 
+                sessionStats.powerReadings.reduce((a, b) => a + b, 0) / sessionStats.powerReadings.length : 0;
+            const avgEfficiency = sessionStats.waveCount > 0 ? 
+                sessionStats.totalEfficiency / sessionStats.waveCount : 0;
+                
+            let csvContent = "ANACONDA WEC SIMULATION REPORT\\n";
+            csvContent += `Generated: ${new Date().toLocaleString()}\\n\\n`;
+            
+            // Performance metrics
+            csvContent += "PERFORMANCE METRICS\\n";
+            csvContent += `Runtime,${Math.floor(runtime / 60)}:${(runtime % 60).toFixed(0).padStart(2, '0')}\\n`;
+            csvContent += `Total Energy Generated,${sessionStats.totalEnergyKWh.toFixed(3)} kWh\\n`;
+            csvContent += `Average Power Output,${avgPower.toFixed(2)} kW\\n`;
+            csvContent += `Peak Power Output,${sessionStats.peakPower.toFixed(2)} kW\\n`;
+            csvContent += `Wave Count,${sessionStats.waveCount}\\n`;
+            csvContent += `System Efficiency,${avgEfficiency.toFixed(1)}%\\n\\n`;
+            
+            // Economic data (example values)
+            csvContent += "ECONOMIC ANALYSIS\\n";
+            csvContent += "Installation Cost,$75000\\n";
+            csvContent += "Annual Maintenance,$5000\\n";
+            csvContent += "Expected Lifespan,20 years\\n";
+            csvContent += `Annual Energy Production,${(avgPower * 24 * 365 / 1000).toFixed(2)} MWh\\n`;
+            csvContent += `Value per MWh,$120\\n`;
+            csvContent += `Annual Revenue,$${(avgPower * 24 * 365 / 1000 * 120).toFixed(2)}\\n`;
+            csvContent += `Simple Payback Period,${(75000 / (avgPower * 24 * 365 / 1000 * 120)).toFixed(1)} years\\n\\n`;
+            
+            // Raw data table
+            csvContent += "TIME SERIES DATA\\n";
+            csvContent += "Time (s),Power Output (kW),Potential Energy (kW),Efficiency (%)\\n";
+            
+            const dataLength = Math.min(
+                sessionStats.timePoints.length,
+                sessionStats.powerReadings.length,
+                sessionStats.potentialEnergy.length,
+                sessionStats.captureFactor.length
+            );
+            
+            for (let i = 0; i < dataLength; i++) {
+                csvContent += `${sessionStats.timePoints[i].toFixed(1)},${sessionStats.powerReadings[i].toFixed(2)},${sessionStats.potentialEnergy[i].toFixed(2)},${sessionStats.captureFactor[i].toFixed(1)}\\n`;
+            }
+            
+            downloadCSV(csvContent, 'anaconda_wec_full_report');
+        }
+
+        function setupGUI() {
+            const gui = new GUI({ title: 'WEC Controls' });
+            gui.add(params, 'animationActive').name('Wave Animation').onChange(triggerWave);
+            gui.add(params, 'waveSpeed', 0.1, 3.0).name('Wave Speed');
+            gui.add(params, 'waveAmplitude', 0.5, 5.0).name('Wave Amplitude');
+            
+            const lighting = gui.addFolder('Lighting');
+            lighting.add(params, 'sunElevation', 0, 20).name('Sun Elevation').onChange(updateSun);
+            lighting.add(params, 'sunAzimuth', 0, 360).name('Sun Azimuth').onChange(updateSun);
+            
+            const effects = gui.addFolder('Effects');
+            effects.add(params, 'enableCinematicView').name('Cinematic View');
+            effects.add(params, 'enableSplash').name('Splash Effects');
+            effects.add(params, 'enableShake').name('Camera Shake');
+            effects.add(params, 'enableDollyZoom').name('Dolly Zoom');
+        }
+
+        function setupUI() {
+            // Get all stats and summary elements by ID
+            statusValue = document.getElementById('statusValue');
+            powerValue = document.getElementById('powerValue');
+            speedValue = document.getElementById('speedValue');
+            rpmValue = document.getElementById('rpmValue');
+            efficiencyValue = document.getElementById('efficiencyValue');
+            waveCountValue = document.getElementById('waveCountValue');
+            summaryPanel = document.getElementById('summaryPanel');
+            summaryTime = document.getElementById('summaryTime');
+            summaryEnergy = document.getElementById('summaryEnergy');
+            summaryAvgPower = document.getElementById('summaryAvgPower');
+            summaryPeakPower = document.getElementById('summaryPeakPower');
+            summaryWaves = document.getElementById('summaryWaves');
+            summaryAvgSpeed = document.getElementById('summaryAvgSpeed');
+            summaryEfficiency = document.getElementById('summaryEfficiency');
+            
+            document.getElementById('summaryCloseBtn').addEventListener('click', () => {
+                summaryPanel.classList.remove('visible');
+                summaryPanel.style.right = '30px'; // Reset position
+            });
+            
+            // View Analytics button click
+            document.getElementById('viewAnalyticsBtn').addEventListener('click', () => {
+                // Data will be available via localStorage
+                window.location.href = 'analytics.html';
+            });
+            
+            // Download Report button click
+            document.getElementById('downloadReportBtn').addEventListener('click', () => {
+                // Reuse existing export functionality
+                exportCSV();
+            });
+
+            labelElements = {
+                tube: document.getElementById('label-tube'),
+                turbine: document.getElementById('label-turbine'),
+                anchor: document.getElementById('label-anchor')
+            };
+            
+            // Initially hide them
+            Object.values(labelElements).forEach(el => el.classList.remove('visible'));
+            setTimeout(() => {
+                Object.values(labelElements).forEach(el => el.classList.add('visible'));
+            }, 2000); // Fade in after 2 seconds
+            
+            // Initialize analytics data structure for data collection
+            setupAnalytics();
+        }
+
+        function triggerWave(isActive) {
+            if (isActive) {
+                if (!isRecording) { // Only reset if starting a new session
+                    isRecording = true;
+                    sessionStats = {
+                        startTime: clock.getElapsedTime(), 
+                        runTime: 0, 
+                        totalEnergyKWh: 0,
+                        peakPower: 0, 
+                        waveCount: 0, 
+                        totalWaveSpeed: 0, 
+                        totalWaveAmplitude: 0,
+                        totalEfficiency: 0,
+                        powerReadings: [],
+                        potentialEnergy: [],
+                        timePoints: [],
+                        captureFactor: []
+                    };
+                    
+                    // Reset charts if they exist
+                    if (powerOutputChart) {
+                        powerOutputChart.data.labels = [];
+                        powerOutputChart.data.datasets[0].data = [];
+                        powerOutputChart.data.datasets[1].data = [];
+                        powerOutputChart.update();
+                    }
+                    
+                    // Reset analytics timer
+                    analyticsUpdateTimer = 0;
+                    
+                    // Immediately store initial data
+                    updateRealTimeAnalytics();
+                }
+                summaryPanel.classList.remove('visible');
+                summaryPanel.style.right = '30px'; // Reset position
+            } else {
+                isRecording = false;
+                showSummary();
+                // Reset tube geometry
+                const vertices = anacondaTube.geometry.attributes.position;
+                for (let i = 0; i < vertices.count; i++) {
+                    vertices.array[i * 3] = originalTubeVertices[i * 3];
+                    vertices.array[i * 3 + 1] = originalTubeVertices[i * 3 + 1];
+                    vertices.array[i * 3 + 2] = originalTubeVertices[i * 3 + 2];
+                }
+                vertices.needsUpdate = true;
+                anacondaTube.geometry.computeVertexNormals();
+                bulgeProgress = 0;
+            }
+        }
+        
+        function showSummary() {
+            // Show summary with updated calculations
+            if (sessionStats.startTime === 0) return;
+            
+            const runtime = sessionStats.runTime || (clock.getElapsedTime() - sessionStats.startTime);
+            const avgPower = sessionStats.powerReadings.length > 0 ? 
+                sessionStats.powerReadings.reduce((a, b) => a + b, 0) / sessionStats.powerReadings.length : 0;
+            const avgSpeed = sessionStats.waveCount > 0 ? sessionStats.totalWaveSpeed / sessionStats.waveCount : 0;
+            const avgEfficiency = sessionStats.waveCount > 0 ? sessionStats.totalEfficiency / sessionStats.waveCount : 0;
+            // Calculate energy density (kW/m²) - based on the power per unit area
+            const tubeArea = Math.PI * Math.pow(params.tubeRadius, 2);
+            const energyDensity = avgPower / tubeArea;
+            
+            // Update summary display
+            summaryTime.textContent = `${Math.floor(runtime / 60)}:${(runtime % 60).toFixed(0).padStart(2, '0')}`;
+            summaryEnergy.textContent = `${sessionStats.totalEnergyKWh.toFixed(3)} kWh`;
+            summaryAvgPower.textContent = `${avgPower.toFixed(2)} kW`;
+            summaryPeakPower.textContent = `${sessionStats.peakPower.toFixed(2)} kW`;
+            summaryWaves.textContent = sessionStats.waveCount.toString();
+            summaryAvgSpeed.textContent = `${avgSpeed.toFixed(2)} m/s`;
+            summaryEfficiency.textContent = `${avgEfficiency.toFixed(1)}%`;
+            
+            // Store session data for analytics page
+            storeSessionData(runtime, avgPower, avgSpeed, avgEfficiency, energyDensity);
+            
+            // Show summary panel with proper positioning
+            adjustSummaryPanelPosition();
+            summaryPanel.classList.add('visible');
+        }
+        
+        function storeSessionData(runtime, avgPower, avgSpeed, avgEfficiency, energyDensity) {
+            // Create session data object for analytics page
+            const sessionData = {
+                timestamp: new Date().toISOString(),
+                runtime: runtime,
+                totalEnergyKWh: sessionStats.totalEnergyKWh,
+                avgPower: avgPower,
+                peakPower: sessionStats.peakPower,
+                waveCount: sessionStats.waveCount,
+                avgSpeed: avgSpeed,
+                avgEfficiency: avgEfficiency,
+                energyDensity: energyDensity,
+                timePoints: [...sessionStats.timePoints], // Create copies to avoid reference issues
+                powerReadings: [...sessionStats.powerReadings],
+                potentialEnergy: [...sessionStats.potentialEnergy],
+                captureFactor: [...sessionStats.captureFactor],
+                waveAmplitude: params.waveAmplitude,
+                waveSpeed: params.waveSpeed,
+                tubeRadius: params.tubeRadius,
+                // Economic data
+                deviceCost: 75000, // Example cost in dollars
+                installationCost: 25000,
+                maintenanceCostAnnual: 5000,
+                lifespan: 20, // years
+                revenuePerMWh: 120 // dollars per MWh
+            };
+            
+            // Store in localStorage for the analytics page to access
+            localStorage.setItem('anacondaSessionData', JSON.stringify(sessionData));
+            console.log('Stored session data to localStorage:', sessionData.timestamp);
+            
+            // Also update real-time data for analytics page if it's open
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'sessionUpdate',
+                    data: sessionData
+                }, '*');
+            }
+        }
+        
+        function updateRealTimeAnalytics() {
+            if (!isRecording) return;
+            
+            const runtime = sessionStats.runTime || (clock.getElapsedTime() - sessionStats.startTime);
+            const avgPower = sessionStats.powerReadings.length > 0 ? 
+                sessionStats.powerReadings.reduce((a, b) => a + b, 0) / sessionStats.powerReadings.length : 0;
+            const avgSpeed = sessionStats.waveCount > 0 ? sessionStats.totalWaveSpeed / sessionStats.waveCount : params.waveSpeed;
+            const avgEfficiency = sessionStats.waveCount > 0 ? sessionStats.totalEfficiency / sessionStats.waveCount : 0;
+            const tubeArea = Math.PI * Math.pow(params.tubeRadius, 2);
+            const energyDensity = avgPower / tubeArea;
+            
+            console.log('Updating analytics:', { runtime, avgPower, avgSpeed, avgEfficiency, energyDensity });
+            storeSessionData(runtime, avgPower, avgSpeed, avgEfficiency, energyDensity);
+        }
+        
+        // Add continuous update timer for analytics
+        let analyticsUpdateTimer = 0;
+        
+        function adjustSummaryPanelPosition() {
+            const viewportWidth = window.innerWidth;
+            const statsPanel = document.getElementById('statsPanel');
+            const summaryPanel = document.getElementById('summaryPanel');
+            
+            const statsRect = statsPanel.getBoundingClientRect();
+            const statsRight = statsRect.right;
+            
+            // Calculate where summary panel will be positioned
+            const summaryWidth = 380; // Current width
+            const summaryLeft = viewportWidth - 30 - summaryWidth; // right: 30px
+            
+            // If panels would overlap, adjust summary panel position
+            if (summaryLeft < statsRight + 20) { // 20px minimum gap
+                summaryPanel.style.right = `${viewportWidth - statsRight - 20}px`;
+            } else {
+                summaryPanel.style.right = '30px'; // Reset to default
+            }
+        }
+        
+        function triggerSplash() {
+            splashParticles.visible = true;
+            particleTimer = 2.0; // How long the splash lasts
+            const positions = splashParticles.geometry.attributes.position.array;
+            const velocities = splashParticles.geometry.attributes.velocity.array;
+            
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = tubeGroup.position.x - tubeLength / 2 - 2;
+                positions[i * 3 + 1] = tubeGroup.position.y + 1.5;
+                positions[i * 3 + 2] = tubeGroup.position.z + (Math.random() - 0.5) * 4;
+                
+                velocities[i * 3] = (Math.random() - 0.8) * 5;
+                velocities[i * 3 + 1] = Math.random() * 10 + 2;
+                velocities[i * 3 + 2] = (Math.random() - 0.5) * 5;
+            }
+            splashParticles.geometry.attributes.position.needsUpdate = true;
+            splashParticles.geometry.attributes.velocity.needsUpdate = true;
+        }
+
+        function updateLabels() {
+            const screenPosition = new THREE.Vector3();
+            const canvas = renderer.domElement;
+
+            // Update Turbine Label
+            turbine.getWorldPosition(screenPosition);
+            screenPosition.project(camera);
+            labelElements.turbine.style.left = `${(screenPosition.x * 0.5 + 0.5) * canvas.clientWidth}px`;
+            labelElements.turbine.style.top = `${(-screenPosition.y * 0.5 + 0.5) * canvas.clientHeight - 40}px`;
+
+            // Update Anchor Label
+            anchor.getWorldPosition(screenPosition);
+            screenPosition.project(camera);
+            labelElements.anchor.style.left = `${(screenPosition.x * 0.5 + 0.5) * canvas.clientWidth}px`;
+            labelElements.anchor.style.top = `${(-screenPosition.y * 0.5 + 0.5) * canvas.clientHeight - 40}px`;
+
+            // Update Tube Label
+            // Get a point in the middle of the tube
+            const tubeMidPoint = new THREE.Vector3(0, 0, 0);
+            anacondaTube.localToWorld(tubeMidPoint);
+            tubeMidPoint.project(camera);
+            labelElements.tube.style.left = `${(tubeMidPoint.x * 0.5 + 0.5) * canvas.clientWidth}px`;
+            labelElements.tube.style.top = `${(-tubeMidPoint.y * 0.5 + 0.5) * canvas.clientHeight - 40}px`;
+        }
+
+        // === ANIMATION LOOP ===
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
+            
+            // ... cinematic camera and controls update ...
+            controls.update();
+            water.material.uniforms['time'].value += 1.0 / 60.0;
+
+            // MODIFIED: More natural tube sway
+            tubeGroup.position.y = 0.5 + Math.sin(elapsedTime * 0.5) * 0.2;
+            tubeGroup.position.z = Math.cos(elapsedTime * 0.2) * 0.5;
+            tubeGroup.rotation.z = Math.sin(elapsedTime * 0.3) * 0.02;
+            tubeGroup.rotation.x = Math.cos(elapsedTime * 0.4) * 0.02;
+
+            let currentPower = 0;
+            let spinFactor = 0;
+            
+            if (params.animationActive) {
+                bulgeProgress += delta * params.waveSpeed;
+                const tubeVertices = anacondaTube.geometry.attributes.position;
+                const bulgeWidth = 30;
+                const bulgeCenter = -tubeLength / 2 + bulgeProgress * tubeLength;
+                let maxDisplacement = 0; // Track maximum displacement for power calculation
+
+                for (let i = 0; i < tubeVertices.count; i++) {
+                    const originalX = originalTubeVertices[i * 3];
+                    const originalY = originalTubeVertices[i * 3 + 1];
+                    const originalZ = originalTubeVertices[i * 3 + 2];
+                    const dist = Math.abs(originalY - bulgeCenter);
+                    let displacement = 0;
+                    
+                    if (dist < bulgeWidth) {
+                        const falloff = (Math.cos((dist / bulgeWidth) * Math.PI) + 1) / 2;
+                        // MODIFIED: Added secondary wave for more natural look
+                        const secondaryWave = Math.sin(originalY * 0.5 + elapsedTime * 5) * 0.1 * falloff;
+                        displacement = params.waveAmplitude * falloff + secondaryWave;
+                        maxDisplacement = Math.max(maxDisplacement, displacement);
+                        
+                        // Apply displacement to vertices
+                        const normal = new THREE.Vector3(originalX, 0, originalZ).normalize();
+                        tubeVertices.array[i * 3] = originalX + normal.x * displacement;
+                        tubeVertices.array[i * 3 + 2] = originalZ + normal.z * displacement;
+                    } else {
+                        // Reset to original position
+                        tubeVertices.array[i * 3] = originalX;
+                        tubeVertices.array[i * 3 + 2] = originalZ;
+                    }
+                    
+                    // Keep Y position unchanged
+                    tubeVertices.array[i * 3 + 1] = originalY;
+                }
+                
+                // Mark the geometry as needing an update
+                tubeVertices.needsUpdate = true;
+                anacondaTube.geometry.computeVertexNormals();
+                
+                // Calculate power output based on the wave displacement
+                const tubeRadius = params.tubeRadius || 1.5; // Use tube radius parameter
+                currentPower = maxDisplacement * params.waveSpeed * 15 * tubeRadius;
+                spinFactor = Math.min(currentPower / 20, 8.0); // Faster turbine spin based on power
+                
+                // Calculate potential energy - theoretical maximum possible from the wave
+                const potentialEnergy = params.waveAmplitude * params.waveSpeed * 25;
+                
+                // Track data points for analytics and update chart data storage
+                if (isRecording) {
+                    // Update session stats with accumulated values
+                    sessionStats.totalEnergyKWh += (currentPower * delta) / 3600; // Convert to kWh
+                    sessionStats.peakPower = Math.max(sessionStats.peakPower, currentPower);
+                    sessionStats.runTime = elapsedTime - sessionStats.startTime;
+                    
+                    // Store data in session stats
+                    sessionStats.powerReadings.push(currentPower);
+                    sessionStats.potentialEnergy.push(potentialEnergy);
+                    sessionStats.timePoints.push(elapsedTime - sessionStats.startTime);
+                    sessionStats.captureFactor.push((currentPower / potentialEnergy) * 100);
+                    
+                    // Keep arrays to last 100 readings for performance
+                    const maxDataPoints = 100;
+                    if (sessionStats.powerReadings.length > maxDataPoints) {
+                        sessionStats.powerReadings = sessionStats.powerReadings.slice(-maxDataPoints);
+                        sessionStats.potentialEnergy = sessionStats.potentialEnergy.slice(-maxDataPoints);
+                        sessionStats.timePoints = sessionStats.timePoints.slice(-maxDataPoints);
+                        sessionStats.captureFactor = sessionStats.captureFactor.slice(-maxDataPoints);
+                    }
+                    
+                    // Store data in chart object (needed for data transfer to analytics page)
+                    if (powerOutputChart.data.labels.length > 30) {
+                        powerOutputChart.data.labels.shift();
+                        powerOutputChart.data.datasets[0].data.shift();
+                        powerOutputChart.data.datasets[1].data.shift();
+                    }
+                    powerOutputChart.data.labels.push((elapsedTime - sessionStats.startTime).toFixed(1));
+                    powerOutputChart.data.datasets[0].data.push(currentPower);
+                    powerOutputChart.data.datasets[1].data.push(potentialEnergy);
+                    
+                    // Update real-time analytics data every few frames
+                    if (Math.floor(elapsedTime * 2) % 2 === 0) { // Update 2 times per second
+                        updateRealTimeAnalytics();
+                    }
+                }
+
+                // MODIFIED: Accurate wave counting and splash trigger
+                if (bulgeCenter > tubeLength / 2 + bulgeWidth) {
+                    bulgeProgress = 0; // Reset for next wave
+                    if (isRecording) { // Log stats for the completed wave
+                        sessionStats.waveCount++;
+                        sessionStats.totalWaveSpeed += params.waveSpeed;
+                        sessionStats.totalWaveAmplitude += params.waveAmplitude;
+                        
+                        // Calculate efficiency for this wave cycle
+                        if (sessionStats.powerReadings.length > 0) {
+                            const recentPowerAvg = sessionStats.powerReadings.slice(-10).reduce((a, b) => a + b, 0) / Math.min(10, sessionStats.powerReadings.length);
+                            const recentPotentialAvg = sessionStats.potentialEnergy.slice(-10).reduce((a, b) => a + b, 0) / Math.min(10, sessionStats.potentialEnergy.length);
+                            const waveEfficiency = recentPotentialAvg > 0 ? (recentPowerAvg / recentPotentialAvg) * 100 : 0;
+                            sessionStats.totalEfficiency += waveEfficiency;
+                        }
+                    }
+                    if (params.enableSplash) {
+                        // Splash at the head/front of the Anaconda tube (where waves start)
+                        triggerSplash();
+                    }
+                    if (params.enableShake) {
+                        cameraShake.active = true;
+                        cameraShake.timer = cameraShake.duration;
+                    }
+                }
+            }
+            
+            // Continuous analytics update when recording
+            if (isRecording) {
+                analyticsUpdateTimer += delta;
+                if (analyticsUpdateTimer >= 0.5) { // Update every 0.5 seconds for faster response
+                    updateRealTimeAnalytics();
+                    analyticsUpdateTimer = 0;
+                }
+            }
+
+            // Camera shake
+            if (cameraShake.active) {
+                cameraShake.timer -= delta;
+                if (cameraShake.timer <= 0) {
+                    cameraShake.active = false;
+                } else {
+                    const intensity = cameraShake.intensity * (cameraShake.timer / cameraShake.duration);
+                    camera.position.x += (Math.random() - 0.5) * intensity;
+                    camera.position.y += (Math.random() - 0.5) * intensity;
+                    camera.position.z += (Math.random() - 0.5) * intensity;
+                }
+            }
+
+            // Turbine rotation
+            if (turbine && currentPower > 0) {
+                const targetRotation = lastTurbineRotation + spinFactor * delta * 20; // Much faster rotation
+                turbine.rotation.z = THREE.MathUtils.lerp(turbine.rotation.z, targetRotation, 0.25);
+                lastTurbineRotation = turbine.rotation.z;
+            } else if (turbine) {
+                // Gradual slowdown when no power
+                turbine.rotation.z *= 0.95;
+                lastTurbineRotation = turbine.rotation.z;
+            }
+
+            // Particle physics
+            if (splashParticles.visible && particleTimer > 0) {
+                particleTimer -= delta;
+                const positions = splashParticles.geometry.attributes.position.array;
+                const velocities = splashParticles.geometry.attributes.velocity.array;
+                
+                for (let i = 0; i < velocities.length / 3; i++) {
+                    // Update positions based on velocities
+                    positions[i * 3] += velocities[i * 3] * delta;
+                    positions[i * 3 + 1] += velocities[i * 3 + 1] * delta;
+                    positions[i * 3 + 2] += velocities[i * 3 + 2] * delta;
+                    
+                    // Apply gravity
+                    velocities[i * 3 + 1] -= 9.8 * delta;
+                    
+                    // Fade out
+                    if (positions[i * 3 + 1] < 0) {
+                        velocities[i * 3] *= 0.8;
+                        velocities[i * 3 + 1] *= -0.3;
+                        velocities[i * 3 + 2] *= 0.8;
+                    }
+                }
+                
+                splashParticles.geometry.attributes.position.needsUpdate = true;
+                splashParticles.geometry.attributes.velocity.needsUpdate = true;
+                
+                if (particleTimer <= 0) {
+                    splashParticles.visible = false;
+                }
+            }
+            
+            // Update Stats UI
+            if (statusValue) {
+                statusValue.textContent = params.animationActive ? 'Active' : 'Idle';
+                powerValue.textContent = `${currentPower.toFixed(2)} kW`;
+                speedValue.textContent = `${params.waveSpeed.toFixed(1)} m/s`;
+                rpmValue.textContent = Math.round(spinFactor * 300); // Higher RPM scaling for visual feedback
+                
+                const efficiency = params.animationActive && sessionStats.potentialEnergy.length > 0 ? 
+                    Math.min(100, (currentPower / (sessionStats.potentialEnergy[sessionStats.potentialEnergy.length - 1] || 1)) * 100) : 0;
+                efficiencyValue.textContent = `${efficiency.toFixed(1)}%`;
+                
+                waveCountValue.textContent = isRecording ? sessionStats.waveCount.toString() : '0';
+            }
+
+            updateLabels(); // NEW: Update label positions every frame
+            composer.render();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Adjust summary panel position if it's visible
+            if (summaryPanel.classList.contains('visible')) {
+                adjustSummaryPanelPosition();
+            }
+        }
+        
+        // Function to set initial view to match screenshot
+        function setInitialView() {
+            // Make sure we start with the camera pointing at the model
+            camera.lookAt(0, 2, 0);
+            controls.update();
+        }
+
+        init();
+        setInitialView();
+        animate();
+    </script>
+</body>
+</html>
