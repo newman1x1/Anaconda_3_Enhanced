@@ -153,8 +153,8 @@ Contributions are welcome! If you'd like to improve Anaconda WEC, please:
   <p>© 2025 Anaconda WEC. All Rights Reserved.</p>
   <p>
     <a href="https://github.com/newman1x1/anaconda-wec">
-      <img src="https://img.shields.io/github/stars/newman1x1/anaconda-wec?style=social" alt="Star on GitHub">
     </a>
   </p>
 </div>
+
 
